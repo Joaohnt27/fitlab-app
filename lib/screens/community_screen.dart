@@ -160,7 +160,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       final body = json.decode(utf8.decode(response.bodyBytes));
 
       if (response.statusCode == 200) {
-        if (context.mounted) {
+        if (mounted) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -170,7 +170,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
           );
         }
       } else {
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(body['erro'] ?? "Erro ao enviar convite"),
@@ -200,12 +200,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
         body: json.encode(payload),
       );
 
-      if (context.mounted && Navigator.canPop(context)) {
+      if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context); 
       }
 
       if (response.statusCode == 200) {
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(response.body), 
@@ -216,7 +216,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
           _checkMentoriaStatus();
         }
       } else {
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(response.body),
@@ -226,7 +226,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         }
       }
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("O sistema está offline no momento."),
@@ -537,7 +537,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
+                          color: Colors.white.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -576,7 +576,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   disabledBackgroundColor: Colors.green
-                                      .withOpacity(0.4),
+                                      .withValues(alpha: 0.4),
                                   disabledForegroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -604,7 +604,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   disabledBackgroundColor: Colors.orange
-                                      .withOpacity(0.4),
+                                      .withValues(alpha: 0.4),
                                   disabledForegroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -805,7 +805,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   letterSpacing: 2,
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: Colors.white.withValues(alpha: 0.05),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -901,7 +901,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   letterSpacing: 2,
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: Colors.white.withValues(alpha: 0.05),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -1038,7 +1038,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: TextField(
         controller: _searchController,
@@ -1086,7 +1086,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.2)),
+        border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1228,9 +1228,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1294,7 +1294,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.02),
+                    color: Colors.white.withValues(alpha: 0.02),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Center(
@@ -1388,7 +1388,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.orangeAccent.withOpacity(0.3)),
+        border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -1475,10 +1475,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF1D4ED8).withOpacity(0.1),
+                color: const Color(0xFF1D4ED8).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: const Color(0xFF1D4ED8).withOpacity(0.3),
+                  color: const Color(0xFF1D4ED8).withValues(alpha: 0.3),
                 ),
               ),
               child: const Row(
@@ -1600,7 +1600,6 @@ class _RankingTile extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _RankingTile({
-    super.key,
     required this.index,
     required this.name,
     this.avatar,
@@ -1639,7 +1638,7 @@ class _RankingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color borderColor = Colors.white.withOpacity(0.05);
+    Color borderColor = Colors.white.withValues(alpha: 0.05);
     Widget rankIcon = Text(
       "${index + 1}",
       style: const TextStyle(
@@ -1651,15 +1650,15 @@ class _RankingTile extends StatelessWidget {
 
     if (!isTrainer) {
       if (index == 0) {
-        borderColor = const Color(0xFFFFD700).withOpacity(0.6);
+        borderColor = const Color(0xFFFFD700).withValues(alpha: 0.6);
         rankIcon = const Text("🥇", style: TextStyle(fontSize: 18));
         borderWidth = 2;
       } else if (index == 1) {
-        borderColor = const Color(0xFFC0C0C0).withOpacity(0.6);
+        borderColor = const Color(0xFFC0C0C0).withValues(alpha: 0.6);
         rankIcon = const Text("🥈", style: TextStyle(fontSize: 18));
         borderWidth = 1.5;
       } else if (index == 2) {
-        borderColor = const Color(0xFFCD7F32).withOpacity(0.6);
+        borderColor = const Color(0xFFCD7F32).withValues(alpha: 0.6);
         rankIcon = const Text("🥉", style: TextStyle(fontSize: 18));
         borderWidth = 1.5;
       }

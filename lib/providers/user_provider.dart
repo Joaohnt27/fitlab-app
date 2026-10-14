@@ -14,7 +14,7 @@ class UserProvider with ChangeNotifier {
   String? _token;
   String? get token => _token;
 
-  Map<String, bool> _prefsNotificacoes = {
+  final Map<String, bool> _prefsNotificacoes = {
     'reminders': true,
     'achievements': true,
     'ranking': false,
@@ -77,7 +77,7 @@ class UserProvider with ChangeNotifier {
       }
       return false; 
     } catch (e) {
-      print("Erro no provedor durante o login: $e");
+      debugPrint("Erro no provedor durante o login: $e");
       return false;
     }
   }
@@ -304,6 +304,7 @@ class UserProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
+        if (!context.mounted) return false;
         ganharXPeVerificarLevelUp(context, 10);
 
         int index = AppData.allBadges.indexWhere((b) => b.id == '1');

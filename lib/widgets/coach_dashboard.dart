@@ -21,7 +21,7 @@ class CoachDashboard extends StatefulWidget {
 }
 
 class _CoachDashboardState extends State<CoachDashboard> {
-  double _ratingCoach = 5.0;
+  final double _ratingCoach = 5.0;
   int _alunosAtivos = 0;
   List<dynamic> _solicitacoesPendentes = [];
   List<dynamic> _topAlunos = []; 
@@ -45,6 +45,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
   }
 
   Future<void> _carregarDadosDashboard() async {
+    if (!mounted) return;
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final idCoach = userProvider.usuarioLogado?.id;
     if (idCoach == null) return;
@@ -74,6 +75,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
         http.get(urlDesafios, headers: headers),
       ]);
 
+      if (!mounted) return;
       setState(() {
         if (responses[0].statusCode == 200) {
           _solicitacoesPendentes = json.decode(utf8.decode(responses[0].bodyBytes));
@@ -95,7 +97,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
       });
     } catch (e) {
       debugPrint("Erro ao carregar dashboard do coach: $e");
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -111,7 +113,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
           : await http.delete(url, headers: _getAuthHeaders());
 
       if (response.statusCode == 200) {
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -126,7 +128,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
           );
         }
 
-        if (context.mounted) {
+        if (mounted) {
           final userProvider = Provider.of<UserProvider>(
             context,
             listen: false,
@@ -134,9 +136,9 @@ class _CoachDashboardState extends State<CoachDashboard> {
           await userProvider.recarregarUsuario();
         }
 
-        _carregarDadosDashboard();
+        if (mounted) _carregarDadosDashboard();
       } else {
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text("Erro ao processar solicitação: ${response.body}"),
@@ -310,7 +312,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.02)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.02)),
         ),
         child: const Column(
           children: [
@@ -333,13 +335,13 @@ class _CoachDashboardState extends State<CoachDashboard> {
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: _topAlunos.length > 10 ? 10 : _topAlunos.length, 
-        separatorBuilder: (context, index) => Divider(color: Colors.white.withOpacity(0.05), height: 1),
+        separatorBuilder: (context, index) => Divider(color: Colors.white.withValues(alpha: 0.05), height: 1),
         itemBuilder: (context, index) {
           final aluno = _topAlunos[index];
           Color positionColor = Colors.white54;
@@ -349,7 +351,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
 
           return ListTile(
             leading: CircleAvatar(
-              backgroundColor: positionColor.withOpacity(0.2),
+              backgroundColor: positionColor.withValues(alpha: 0.2),
               child: Text(
                 "#${index + 1}",
                 style: TextStyle(color: positionColor, fontWeight: FontWeight.bold, fontSize: 12),
@@ -387,7 +389,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.02)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.02)),
         ),
         child: const Column(
           children: [
@@ -414,13 +416,13 @@ class _CoachDashboardState extends State<CoachDashboard> {
           decoration: BoxDecoration(
             color: const Color(0xFF1A1A1A),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.2)),
+            border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.2)),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
                 const Color(0xFF1A1A1A),
-                const Color(0xFF06B6D4).withOpacity(0.05),
+                const Color(0xFF06B6D4).withValues(alpha: 0.05),
               ],
             )
           ),
@@ -431,7 +433,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
                 decoration: BoxDecoration(
                   color: Colors.black,
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.5))
+                  border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.5))
                 ),
                 child: const Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 24),
               ),
@@ -477,9 +479,9 @@ class _CoachDashboardState extends State<CoachDashboard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF06B6D4).withOpacity(0.1),
+        color: const Color(0xFF06B6D4).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -508,9 +510,9 @@ class _CoachDashboardState extends State<CoachDashboard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.amber.withOpacity(0.1),
+        color: Colors.amber.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -563,9 +565,9 @@ class _CoachDashboardState extends State<CoachDashboard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -595,7 +597,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -747,7 +749,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
             color: const Color(0xFF1A1A1A),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isLocked ? Colors.white10 : Colors.white.withOpacity(0.05),
+              color: isLocked ? Colors.white10 : Colors.white.withValues(alpha: 0.05),
             ),
           ),
           child: Row(
@@ -781,7 +783,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF06B6D4).withOpacity(0.1),
+        color: const Color(0xFF06B6D4).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -821,12 +823,12 @@ class _StatMiniCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.02)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.02)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color.withOpacity(0.5), size: 16),
+            Icon(icon, color: color.withValues(alpha: 0.5), size: 16),
             const SizedBox(height: 8),
             Text(
               label,

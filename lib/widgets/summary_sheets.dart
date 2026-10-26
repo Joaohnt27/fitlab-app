@@ -7,9 +7,11 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../providers/user_provider.dart';
 import '../config/api_constants.dart';
+import '../utils/route_codec.dart';
 
 class SummarySheet extends StatefulWidget {
   final List<LatLng> route;
+  final List<List<LatLng>>? routeSegments;
   final double distance;
   final int duration;
   final int xp;
@@ -20,6 +22,7 @@ class SummarySheet extends StatefulWidget {
   const SummarySheet({
     super.key,
     required this.route,
+    this.routeSegments,
     required this.distance,
     required this.duration,
     required this.xp,
@@ -39,6 +42,8 @@ class _SummarySheetState extends State<SummarySheet>
   bool _isPosting = false;
   
   String _privacidade = "TODOS";
+
+  List<List<LatLng>> get _segments => widget.routeSegments ?? [widget.route];
 
   Map<String, String> _getAuthHeaders() {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
@@ -124,24 +129,7 @@ Baixe o FitLab e venha pro laboratório também! 🧬
     final String nomeAtividade = widget.tipoAtividade.toLowerCase();
     final String iconeAtividade = nomeAtividade == "corrida" ? "🏃‍♂️" : "🚶‍♂️";
 
-    // Algoritmo de Amostragem (Evita erro 500 no Banco)
-    List<LatLng> rotaOtimizada = [];
-    if (widget.route.isNotEmpty) {
-      int step = (widget.route.length / 50).ceil();
-      if (step < 1) step = 1;
-      
-      for (int i = 0; i < widget.route.length; i += step) {
-        rotaOtimizada.add(widget.route[i]);
-      }
-      
-      if (rotaOtimizada.last != widget.route.last) {
-        rotaOtimizada.add(widget.route.last);
-      }
-    }
-
-    final String rotaCodificada = rotaOtimizada
-        .map((p) => "${p.latitude.toStringAsFixed(5)},${p.longitude.toStringAsFixed(5)}")
-        .join("|");
+    final rotaCodificada = RouteCodec.encode(_segments);
 
     final payload = {
       "titulo": "Finalizei meu treino de $nomeAtividade no FitLab! Percorri ${widget.distance.toStringAsFixed(2)} km em $minutos minutos!",
@@ -505,11 +493,12 @@ Baixe o FitLab e venha pro laboratório também! 🧬
                         if (widget.route.isNotEmpty)
                           PolylineLayer(
                             polylines: [
-                              Polyline(
-                                points: widget.route,
-                                color: const Color(0xFF06B6D4),
-                                strokeWidth: 5,
-                              ),
+                              for (final segment in _segments)
+                                Polyline(
+                                  points: segment,
+                                  color: const Color(0xFF06B6D4),
+                                  strokeWidth: 5,
+                                ),
                             ],
                           ),
                         if (widget.route.isNotEmpty)

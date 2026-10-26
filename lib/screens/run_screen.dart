@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -11,7 +10,8 @@ import '../providers/user_provider.dart';
 import '../widgets/summary_sheets.dart';
 import '../widgets/countdown_overlay.dart';
 import '../config/api_constants.dart';
-import '../services/notification_service.dart'; 
+import '../models/run_tracker.dart';
+import '../services/notification_service.dart';
 
 class RunScreen extends StatefulWidget {
   const RunScreen({super.key});
@@ -26,8 +26,9 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
   bool isCountingDown = false;
   int countdownValue = 5;
 
-  int duration = 0;
-  double distance = 0.0;
+  final RunTracker _tracker = RunTracker();
+  int get duration => _tracker.activeSeconds;
+  double get distance => _tracker.distanceKm;
   String pace = "0:00";
   int steps = 0;
   int calories = 0;
@@ -39,8 +40,8 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
   LatLng currentPosition = const LatLng(0, 0);
   double currentHeading = 0.0;
 
-  List<LatLng> route = [];
-  List<Map<String, dynamic>> routeData = [];
+  List<List<LatLng>> get routeSegments => _tracker.segments;
+  List<LatLng> get route => routeSegments.expand((segment) => segment).toList();
 
   final MapController _mapController = MapController();
   Timer? _timer;
@@ -181,7 +182,6 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
 
     if (progress >= 1.0 && isRunAlertsEnabled && !_jaNotificouMeta) {
       _jaNotificouMeta = true;
-      // 👇 Disparo usando o novo Serviço 👇
       NotificationService().showNotification(
         title: 'Meta Atingida! 🥇', 
         body: 'Parabéns! Você concluiu 100% do seu objetivo de hoje no FitLab.',
@@ -196,7 +196,6 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
     final isRunAlertsEnabled = userProvider.prefsNotificacoes['run_alerts'] ?? true;
     
     if (isRunAlertsEnabled) {
-      // 👇 Disparo usando o novo Serviço 👇
       NotificationService().showNotification(
         title: 'Treino Iniciado 🏃‍♂️', 
         body: 'Bora suar a camisa no laboratório! O FitLab está monitorando.',
@@ -206,14 +205,8 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
     setState(() {
       isRunning = true;
       isPaused = false;
-      if (route.isEmpty && currentPosition.latitude != 0) {
-        route.add(currentPosition);
-        routeData.add({
-          "lat": currentPosition.latitude,
-          "lng": currentPosition.longitude,
-          "timestamp": DateTime.now().toIso8601String(),
-        });
-      }
+      _tracker.start();
+      pace = "0:00";
     });
 
     _moveCameraToPlayer();
@@ -226,7 +219,7 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!isPaused) {
         setState(() {
-          duration++;
+          _tracker.tick();
           if (distance > 0) {
             double paceMinutes = (duration / 60) / distance;
             int mins = paceMinutes.floor();
@@ -246,51 +239,46 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
             distanceFilter: 3,
           ),
         ).listen((Position position) {
-          if (position.accuracy > 15.0) return;
-
-          if (!isPaused) {
-            setState(() {
-              LatLng newPosition = LatLng(
-                position.latitude,
-                position.longitude,
-              );
-              final timestamp = DateTime.now().toIso8601String();
-
-              routeData.add({
-                "lat": newPosition.latitude,
-                "lng": newPosition.longitude,
-                "timestamp": timestamp,
-              });
-
-              if (route.isNotEmpty) {
-                final double incrementMeters = distanceCalculator.distance(
-                  currentPosition,
-                  newPosition,
-                );
-
-                if (incrementMeters > 1.0) {
-                  double bearing = distanceCalculator.bearing(
-                    currentPosition,
-                    newPosition,
-                  );
-                  currentHeading = bearing * (pi / 180.0);
-                }
-
-                distance += (incrementMeters / 1000.0);
-
-                steps = (distance * 1200).toInt();
-                calories = (distance * 55).toInt();
-              }
-
-              currentPosition = newPosition;
-              route.add(currentPosition);
-              _moveCameraToPlayer();
-            });
-          }
+          if (position.accuracy > RunTracker.maxAccuracyMeters) return;
+          final newPosition = LatLng(position.latitude, position.longitude);
+          final previous = _tracker.lastActivePosition;
+          final accepted = _tracker.addPosition(
+            newPosition,
+            accuracy: position.accuracy,
+            timestamp: DateTime.now().toIso8601String(),
+          );
+          if (!accepted) return;
+          setState(() {
+            if (previous != null &&
+                distanceCalculator.distance(previous, newPosition) > 1.0) {
+              currentHeading =
+                  distanceCalculator.bearing(previous, newPosition) *
+                  (pi / 180.0);
+            }
+            steps = (distance * 1200).toInt();
+            calories = (distance * 55).toInt();
+            currentPosition = newPosition;
+            _moveCameraToPlayer();
+          });
         });
   }
 
+  void _pauseRun() {
+    setState(() {
+      _tracker.pause();
+      isPaused = true;
+    });
+  }
+
+  void _resumeRun() {
+    setState(() {
+      _tracker.resume();
+      isPaused = false;
+    });
+  }
+
   Future<void> _stopRun() async {
+    _tracker.stop();
     if (duration < 60 || distance < 0.05) {
       _timer?.cancel();
       _positionStream?.cancel();
@@ -305,10 +293,7 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
       setState(() {
         isRunning = false;
         isPaused = false;
-        duration = 0;
-        distance = 0;
-        route = [];
-        routeData = [];
+        _tracker.reset();
         steps = 0;
         calories = 0;
         currentHeading = 0.0;
@@ -333,7 +318,7 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
       "calorias": calories,
       "treinoPlanejado": false,
       "km": distance,
-      "rota": routeData,
+      "rota": _tracker.routeData,
     });
 
     try {
@@ -379,6 +364,7 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
       builder: (context) => SummarySheet(
         tipoAtividade: selectedMode,
         route: route,
+        routeSegments: routeSegments,
         distance: finalDistance,
         duration: duration,
         xp: xp,
@@ -388,10 +374,8 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
           setState(() {
             isRunning = false;
             isPaused = false;
-            duration = 0;
-            distance = 0;
-            route = [];
-            routeData = [];
+            _tracker.reset();
+            pace = "0:00";
             steps = 0;
             calories = 0;
             currentHeading = 0.0;
@@ -457,11 +441,12 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
               if (route.isNotEmpty)
                 PolylineLayer(
                   polylines: [
-                    Polyline(
-                      points: route,
-                      color: const Color(0xFF06B6D4),
-                      strokeWidth: 5,
-                    ),
+                    for (final segment in routeSegments)
+                      Polyline(
+                        points: segment,
+                        color: const Color(0xFF06B6D4),
+                        strokeWidth: 5,
+                      ),
                   ],
                 ),
               if (currentPosition.latitude != 0)
@@ -757,7 +742,7 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
                 child: _buildHUDButton(
                   "CONTINUAR",
                   const Color(0xFF06B6D4),
-                  () => setState(() => isPaused = false),
+                  _resumeRun,
                 ),
               ),
             ] else
@@ -765,7 +750,7 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
                 child: _buildHUDButton(
                   "PAUSAR",
                   Colors.white.withOpacity(0.05),
-                  () => setState(() => isPaused = true),
+                  _pauseRun,
                   hasBorder: true,
                 ),
               ),

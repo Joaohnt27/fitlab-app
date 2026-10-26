@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import 'dart:convert';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import '../providers/user_provider.dart';
 import '../widgets/comments_sheet.dart';
 import '../config/api_constants.dart';
+import '../utils/route_codec.dart';
 
 class FeedCard extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -121,31 +120,10 @@ class _FeedCardState extends State<FeedCard> {
       } catch (_) {}
     }
 
-    // DECODIFICADOR DO MAPA 
-    String? imagemData = widget.post['imagem'];
-    bool isMapRoute =
-        imagemData != null &&
-        imagemData.contains(',') &&
-        !imagemData.startsWith('http');
-    List<LatLng> routePoints = [];
-
-    if (isMapRoute) {
-      try {
-        final points = imagemData.split('|');
-        for (var p in points) {
-          final coords = p.split(',');
-          if (coords.length == 2) {
-            final lat = double.tryParse(coords[0]);
-            final lng = double.tryParse(coords[1]);
-            if (lat != null && lng != null) {
-              routePoints.add(LatLng(lat, lng));
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint("Erro ao decodificar rota no feed: $e");
-      }
-    }
+    final String? imagemData = widget.post['imagem'];
+    final routeSegments = RouteCodec.decode(imagemData);
+    final routePoints = routeSegments.expand((segment) => segment).toList();
+    final isMapRoute = routePoints.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -277,11 +255,12 @@ class _FeedCardState extends State<FeedCard> {
                           ),
                           PolylineLayer(
                             polylines: [
-                              Polyline(
-                                points: routePoints,
-                                color: const Color(0xFF06B6D4),
-                                strokeWidth: 4,
-                              ),
+                              for (final segment in routeSegments)
+                                Polyline(
+                                  points: segment,
+                                  color: const Color(0xFF06B6D4),
+                                  strokeWidth: 4,
+                                ),
                             ],
                           ),
                         ],

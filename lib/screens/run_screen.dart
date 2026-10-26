@@ -4,17 +4,19 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../providers/user_provider.dart';
 import '../widgets/summary_sheets.dart';
 import '../widgets/countdown_overlay.dart';
-import '../config/api_constants.dart';
 import '../models/run_tracker.dart';
+import '../models/activity_save_attempt.dart';
+import '../services/session_api.dart';
 import '../services/notification_service.dart';
 
 class RunScreen extends StatefulWidget {
-  const RunScreen({super.key});
+  final int? sessaoId;
+  final double? distanciaPlanejadaKm;
+  final int? duracaoPlanejadaSegundos;
+  const RunScreen({super.key, this.sessaoId, this.distanciaPlanejadaKm, this.duracaoPlanejadaSegundos});
 
   @override
   State<RunScreen> createState() => _RunScreenState();
@@ -47,6 +49,12 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
   Timer? _timer;
   StreamSubscription<Position>? _positionStream;
 
+  ActivitySaveAttempt? _attempt;
+  int? _attemptUserId;
+  bool _saving = false;
+  String? _saveError;
+  bool _summaryOpen = false;
+
   bool _jaNotificouMeta = false; 
 
   final List<String> goalOptions = [
@@ -63,6 +71,18 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    if (widget.sessaoId != null) {
+      if (widget.distanciaPlanejadaKm != null) {
+        selectedGoalType = "Distância";
+        targetValue = widget.distanciaPlanejadaKm!;
+      } else if (widget.duracaoPlanejadaSegundos != null) {
+        selectedGoalType = "Duração";
+        targetValue = widget.duracaoPlanejadaSegundos! / 60;
+      } else {
+        selectedGoalType = "Sem Metas";
+        targetValue = 0;
+      }
+    }
     _checkPermissionsAndGetLocation();
   }
 
@@ -145,6 +165,7 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
   }
 
   void _triggerCountdown() {
+    if (_attempt != null) return;
     setState(() {
       isCountingDown = true;
       countdownValue = 6;
@@ -178,7 +199,8 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
     }
 
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final isRunAlertsEnabled = userProvider.prefsNotificacoes['run_alerts'] ?? true;
+    final isRunAlertsEnabled =
+        userProvider.prefsNotificacoes['run_alerts'] ?? true;
 
     if (progress >= 1.0 && isRunAlertsEnabled && !_jaNotificouMeta) {
       _jaNotificouMeta = true;
@@ -190,10 +212,12 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
   }
 
   void _startRun() {
+    if (_attempt != null) return;
     _jaNotificouMeta = false;
 
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final isRunAlertsEnabled = userProvider.prefsNotificacoes['run_alerts'] ?? true;
+    final isRunAlertsEnabled =
+        userProvider.prefsNotificacoes['run_alerts'] ?? true;
     
     if (isRunAlertsEnabled) {
       NotificationService().showNotification(
@@ -264,6 +288,7 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
   }
 
   void _pauseRun() {
+    if (_attempt != null) return;
     setState(() {
       _tracker.pause();
       isPaused = true;
@@ -271,6 +296,7 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
   }
 
   void _resumeRun() {
+    if (_attempt != null) return;
     setState(() {
       _tracker.resume();
       isPaused = false;
@@ -278,6 +304,7 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _stopRun() async {
+    if (_attempt != null) return;
     _tracker.stop();
     if (duration < 60 || distance < 0.05) {
       _timer?.cancel();
@@ -306,58 +333,66 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
     _timer?.cancel();
     _positionStream?.cancel();
 
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final idUsuario = userProvider.usuarioLogado?.id ?? 1;
-    final token = userProvider.token;
-
-    final body = jsonEncode({
-      "idUsuario": idUsuario,
+    final user = context.read<UserProvider>().usuarioLogado;
+    _attemptUserId = user?.id;
+    _attempt = ActivitySaveAttempt({
+      "sessaoId": widget.sessaoId,
+      "duracaoAtivaSegundos": duration,
       "tipoAtividade": selectedMode,
       "tempo": _formatTime(duration),
       "pace": pace,
       "calorias": calories,
-      "treinoPlanejado": false,
       "km": distance,
       "rota": _tracker.routeData,
     });
-
-    try {
-      final response = await http.post(
-        Uri.parse('${ApiConstants.baseUrl}/atividades/registrar'),
-        headers: {
-          "Content-Type": "application/json",
-          if (token != null) "Authorization": "Bearer $token",
-        },
-        body: body,
-      );
-
-      if (response.statusCode == 200) {
-        final recompensas = json.decode(utf8.decode(response.bodyBytes));
-        int xpReal = recompensas['xpGanhos'] ?? 0;
-        double distanciaOficial = recompensas['distanciaOficial'] ?? distance;
-
-        await userProvider.recarregarUsuario();
-
-        List<dynamic> badgesGanhas = [];
-        if (recompensas['badgesDesbloqueadas'] != null) {
-          badgesGanhas = recompensas['badgesDesbloqueadas'];
+    await _savePending();
         }
 
-        _showSummary(xpReal, distanciaOficial, badgesGanhas);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erro na API: ${response.statusCode}")),
+  Future<void> _savePending() async {
+    if (_saving || _summaryOpen || _attempt == null) return;
+    final provider = context.read<UserProvider>();
+    if (provider.usuarioLogado == null ||
+        provider.usuarioLogado?.id != _attemptUserId) {
+      setState(
+        () => _saveError =
+            'Entre na mesma conta para salvar esta corrida. Os dados continuam nesta tela.',
         );
-        _showSummary(0, distance, []);
+      return;
       }
-    } catch (e) {
-      debugPrint("Erro de conexão: $e");
-      _showSummary(0, distance, []);
-    }
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+    final api = SessionApi(token: provider.token);
+    final result = await _attempt!.save(api);
+    api.close();
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      _saveError = _attempt!.error;
+    });
+    if (result == null)
+      return; // No success UI, reset, or new logical save on error.
+    await provider.recarregarUsuario().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {},
+    );
+    if (!mounted) return;
+    _showSummary(
+      result['xpGanhos'] ?? 0,
+      (result['distanciaOficial'] as num?)?.toDouble() ?? distance,
+      result['badgesDesbloqueadas'] ?? [],
+    );
   }
 
-  void _showSummary(int xp, double finalDistance, List<dynamic> badgesGanhas) {
-    showModalBottomSheet(
+  Future<void> _showSummary(
+    int xp,
+    double finalDistance,
+    List<dynamic> badgesGanhas,
+  ) async {
+    if (_summaryOpen) return;
+    _summaryOpen = true;
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -370,21 +405,9 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
         xp: xp,
         pace: pace,
         onClose: () {
-          context.read<UserProvider>().ganharXPeVerificarLevelUp(context, xp);
-          setState(() {
-            isRunning = false;
-            isPaused = false;
-            _tracker.reset();
-            pace = "0:00";
-            steps = 0;
-            calories = 0;
-            currentHeading = 0.0;
-            _jaNotificouMeta = false;
-          });
-
           Navigator.pop(context);
 
-          if (badgesGanhas.isNotEmpty) {
+          if (badgesGanhas.isNotEmpty && widget.sessaoId == null) {
             final userProvider = Provider.of<UserProvider>(
               context,
               listen: false,
@@ -405,10 +428,31 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
         },
       ),
     );
+    if (!mounted) return;
+    setState(() {
+      _summaryOpen = false;
+      _attempt = null;
+      _attemptUserId = null;
+      _saveError = null;
+      isRunning = false;
+      isPaused = false;
+      _tracker.reset();
+      pace = "0:00";
+      steps = 0;
+      calories = 0;
+      currentHeading = 0;
+      _jaNotificouMeta = false;
+    });
+    if (widget.sessaoId != null) Navigator.pop(context, true);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PopScope(
+    canPop: _attempt == null,
+    child: _buildRunContent(),
+  );
+
+  Widget _buildRunContent() {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -498,6 +542,31 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
           ),
 
           if (isCountingDown) CountdownOverlay(value: countdownValue),
+          if (_attempt != null && !_summaryOpen)
+            Positioned(
+              top: 70,
+              left: 16,
+              right: 16,
+              child: Material(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Text(_saving
+                          ? 'Salvando atividade...'
+                          : _saveError ?? 'Aguardando confirmação do salvamento.'),
+                      if (!_saving)
+                        TextButton(
+                          onPressed: _savePending,
+                          child: const Text('Tentar salvar novamente'),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -848,10 +917,7 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
         decoration: BoxDecoration(
           color: const Color(0xFF1D4ED8),
           shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white,
-            width: 2.5,
-          ), 
+          border: Border.all(color: Colors.white, width: 2.5),
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF1D4ED8).withOpacity(0.6),
@@ -907,7 +973,12 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
       builder: (context) => Padding(
-        padding: const EdgeInsets.only(top: 16, bottom: 32, left: 24, right: 24),
+        padding: const EdgeInsets.only(
+          top: 16,
+          bottom: 32,
+          left: 24,
+          right: 24,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -932,7 +1003,8 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
             const SizedBox(height: 20),
             
             ...options.map((opt) {
-              bool isSelected = (title == "Meta" && selectedGoalType == opt) ||
+              bool isSelected =
+                  (title == "Meta" && selectedGoalType == opt) ||
                                 (title == "Modalidade" && selectedMode == opt);
 
               return GestureDetector(
@@ -946,7 +1018,10 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
                 },
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
                   decoration: BoxDecoration(
                     color: isSelected 
                         ? const Color(0xFF06B6D4).withOpacity(0.1) 
@@ -966,8 +1041,12 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
                       Text(
                         opt,
                         style: TextStyle(
-                          color: isSelected ? const Color(0xFF06B6D4) : Colors.white,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected
+                              ? const Color(0xFF06B6D4)
+                              : Colors.white,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                           fontSize: 16,
                         ),
                       ),

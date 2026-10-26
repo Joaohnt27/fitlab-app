@@ -13,6 +13,7 @@ import '../widgets/ai_training_result_card.dart';
 import '../widgets/coach_dashboard.dart';
 import '../config/api_constants.dart';
 import 'chat_room_screen.dart';
+import 'plan_sessions_screen.dart';
 
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
@@ -808,6 +809,29 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                     ],
 
                     const SizedBox(height: 32),
+                    if (!isTreinador) Material(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(24),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlanSessionsScreen())),
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: .2))),
+                          child: Row(children: [
+                            const Icon(Icons.event_note_outlined, color: Color(0xFF06B6D4), size: 26),
+                            const SizedBox(width: 16),
+                            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text('Sessões e planos', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                              SizedBox(height: 4),
+                              Text('Seu cronograma de treinos', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                            ])),
+                            const Icon(Icons.chevron_right, color: Color(0xFF06B6D4), size: 20),
+                          ]),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     _SectionHeader(
                       title: "Desafios Ativos",
                       onViewAll: () {

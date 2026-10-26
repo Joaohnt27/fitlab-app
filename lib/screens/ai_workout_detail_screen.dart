@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import '../config/api_constants.dart';
 import 'subscription_screen.dart';
+import 'plan_sessions_screen.dart';
 
 class AIWorkoutDetailScreen extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -314,19 +315,19 @@ class AIWorkoutDetailScreen extends StatelessWidget {
         inputsUsuario?['meta']?.toString().toUpperCase() ?? "PERFORMANCE";
     final String tituloIA = data['titulo'] ?? "Protocolo de Treinamento";
     final String focoIA =
-        data['foco'] ?? "Baseado na sua biometria e histórico de 30 dias.";
+        data['foco'] ?? "Plano salvo. Consulte a prescrição e as sessões disponíveis.";
 
-    final List<dynamic> dias = data['dias'] ?? [];
-    final List<dynamic> aquecimento =
-        data['aquecimento'] ?? ["Mobilidade básica (5 min)"];
+    final rawDias = data['dias'];
+    final List<dynamic> dias = rawDias is List ? rawDias.whereType<Map>().toList() : [];
+    final rawAquecimento = data['aquecimento'];
+    final List<dynamic> aquecimento = rawAquecimento is List ? rawAquecimento : [];
 
     double distanciaTotal = 0;
     for (var dia in dias) {
       distanciaTotal +=
           double.tryParse(dia['distancia_km']?.toString() ?? "0") ?? 0;
     }
-    final String janelaMedia =
-        "${(distanciaTotal * 5).round()}-${(distanciaTotal * 7).round()} min/dia";
+
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D0D),
@@ -349,6 +350,13 @@ class AIWorkoutDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(meta, tituloIA, focoIA),
+            if (data['limitacao_estrutura'] != null) ...[
+              Text(data['limitacao_estrutura']),
+              if (data['conteudo_original'] is String) SelectableText(data['conteudo_original']),
+            ],
+            const SizedBox(height: 16),
+            if (data['id'] is int) PlanActivationCard(planoId: data['id'])
+            else const Text('Plano sem identificador persistido. Consulte o histórico antes de ativar.'),
             const SizedBox(height: 32),
             Row(
               children: [
@@ -358,7 +366,7 @@ class AIWorkoutDetailScreen extends StatelessWidget {
                   Icons.straighten,
                 ),
                 const SizedBox(width: 12),
-                _buildMetricBox("MÉDIA DIÁRIA", janelaMedia, Icons.timer),
+                _buildMetricBox("DIAS NO PLANO", "${dias.length}", Icons.event_note),
               ],
             ),
             const SizedBox(height: 32),
@@ -429,7 +437,7 @@ class AIWorkoutDetailScreen extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                dia['dia'] ?? '',
+                                dia['dia']?.toString() ?? '',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -437,7 +445,7 @@ class AIWorkoutDetailScreen extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                "${dia['distancia_km']} km",
+                                dia['distancia_km'] == null ? "Distância não prescrita" : "${dia['distancia_km']} km",
                                 style: const TextStyle(
                                   color: Color(0xFF06B6D4),
                                   fontWeight: FontWeight.bold,
@@ -447,7 +455,7 @@ class AIWorkoutDetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            dia['descricao'] ?? '',
+                            dia['descricao']?.toString() ?? '',
                             style: const TextStyle(
                               color: Colors.white,
                               height: 1.5,

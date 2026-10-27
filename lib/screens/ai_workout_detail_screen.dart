@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../providers/user_provider.dart';
+import '../services/session_api.dart';
 import '../config/api_constants.dart';
 import 'subscription_screen.dart';
 import 'plan_sessions_screen.dart';
@@ -19,7 +20,7 @@ class AIWorkoutDetailScreen extends StatelessWidget {
   ) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final usuario = userProvider.usuarioLogado;
-    final token = userProvider.token; 
+    final token = userProvider.token;
 
     final idTreino = data['id'];
 
@@ -39,7 +40,7 @@ class AIWorkoutDetailScreen extends StatelessWidget {
 
     showDialog(
       context: context,
-      barrierDismissible: false, 
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return Dialog(
           backgroundColor: const Color(0xFF1A1A1A),
@@ -131,7 +132,7 @@ class AIWorkoutDetailScreen extends StatelessWidget {
       }
     } catch (e) {
       debugPrint("Erro ao solicitar ajuste: $e");
-      if (context.mounted) Navigator.pop(context); 
+      if (context.mounted) Navigator.pop(context);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -141,6 +142,46 @@ class AIWorkoutDetailScreen extends StatelessWidget {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _abrirAjusteOuSessoes(BuildContext context) async {
+    final id = data['id'];
+    if (id == null) {
+      _abrirDialogoAjuste(context);
+      return;
+    }
+    final api = SessionApi(token: context.read<UserProvider>().token);
+    try {
+      final plano = await api.get('/planos-ia/$id');
+      if (!context.mounted) return;
+      if (plano['dataAtivacao'] != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Para ajustar um plano ativado, abra uma sessão concluída e selecione Reavaliar próximas sessões.',
+            ),
+          ),
+        );
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PlanSessionsScreen()),
+        );
+      } else {
+        _abrirDialogoAjuste(context);
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não foi possível verificar o plano. Tente novamente.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      api.close();
     }
   }
 
@@ -315,19 +356,23 @@ class AIWorkoutDetailScreen extends StatelessWidget {
         inputsUsuario?['meta']?.toString().toUpperCase() ?? "PERFORMANCE";
     final String tituloIA = data['titulo'] ?? "Protocolo de Treinamento";
     final String focoIA =
-        data['foco'] ?? "Plano salvo. Consulte a prescrição e as sessões disponíveis.";
+        data['foco'] ??
+        "Plano salvo. Consulte a prescrição e as sessões disponíveis.";
 
     final rawDias = data['dias'];
-    final List<dynamic> dias = rawDias is List ? rawDias.whereType<Map>().toList() : [];
+    final List<dynamic> dias = rawDias is List
+        ? rawDias.whereType<Map>().toList()
+        : [];
     final rawAquecimento = data['aquecimento'];
-    final List<dynamic> aquecimento = rawAquecimento is List ? rawAquecimento : [];
+    final List<dynamic> aquecimento = rawAquecimento is List
+        ? rawAquecimento
+        : [];
 
     double distanciaTotal = 0;
     for (var dia in dias) {
       distanciaTotal +=
           double.tryParse(dia['distancia_km']?.toString() ?? "0") ?? 0;
     }
-
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D0D),
@@ -352,11 +397,16 @@ class AIWorkoutDetailScreen extends StatelessWidget {
             _buildHeader(meta, tituloIA, focoIA),
             if (data['limitacao_estrutura'] != null) ...[
               Text(data['limitacao_estrutura']),
-              if (data['conteudo_original'] is String) SelectableText(data['conteudo_original']),
+              if (data['conteudo_original'] is String)
+                SelectableText(data['conteudo_original']),
             ],
             const SizedBox(height: 16),
-            if (data['id'] is int) PlanActivationCard(planoId: data['id'])
-            else const Text('Plano sem identificador persistido. Consulte o histórico antes de ativar.'),
+            if (data['id'] is int)
+              PlanActivationCard(planoId: data['id'])
+            else
+              const Text(
+                'Plano sem identificador persistido. Consulte o histórico antes de ativar.',
+              ),
             const SizedBox(height: 32),
             Row(
               children: [
@@ -366,7 +416,11 @@ class AIWorkoutDetailScreen extends StatelessWidget {
                   Icons.straighten,
                 ),
                 const SizedBox(width: 12),
-                _buildMetricBox("DIAS NO PLANO", "${dias.length}", Icons.event_note),
+                _buildMetricBox(
+                  "DIAS NO PLANO",
+                  "${dias.length}",
+                  Icons.event_note,
+                ),
               ],
             ),
             const SizedBox(height: 32),
@@ -445,7 +499,9 @@ class AIWorkoutDetailScreen extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                dia['distancia_km'] == null ? "Distância não prescrita" : "${dia['distancia_km']} km",
+                                dia['distancia_km'] == null
+                                    ? "Distância não prescrita"
+                                    : "${dia['distancia_km']} km",
                                 style: const TextStyle(
                                   color: Color(0xFF06B6D4),
                                   fontWeight: FontWeight.bold,
@@ -557,7 +613,7 @@ class AIWorkoutDetailScreen extends StatelessWidget {
         color: const Color(0xFF06B6D4).withOpacity(0.1),
       ),
       child: ElevatedButton.icon(
-        onPressed: () => _abrirDialogoAjuste(context),
+        onPressed: () => _abrirAjusteOuSessoes(context),
         icon: const Icon(Icons.auto_fix_high, color: Color(0xFF06B6D4)),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,

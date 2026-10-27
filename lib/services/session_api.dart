@@ -13,10 +13,13 @@ class SessionApi {
   Future<dynamic> get(String path) => _send('GET', path);
   Future<dynamic> post(String path, [Map<String, dynamic>? body]) =>
       _send('POST', path, body);
+  Future<dynamic> requestAdjustment(String path, Map<String, dynamic> body) =>
+      _send('POST', path, body, const Duration(seconds: 45));
   Future<dynamic> _send(
     String method,
     String path, [
     Map<String, dynamic>? body,
+    Duration timeout = const Duration(seconds: 20),
   ]) async {
     final headers = {
       'Content-Type': 'application/json; charset=UTF-8',
@@ -31,7 +34,7 @@ class SessionApi {
                     headers: headers,
                     body: jsonEncode(body ?? {}),
                   ))
-            .timeout(const Duration(seconds: 20));
+            .timeout(timeout);
     dynamic decoded;
     try {
       decoded = jsonDecode(utf8.decode(response.bodyBytes));

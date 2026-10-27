@@ -214,7 +214,7 @@ class _CoachDashboardState extends State<CoachDashboard> {
                 ),
                 const SizedBox(width: 12),
                 _StatMiniCard(
-                  label: "SALDO A RECEBER",
+                  label: "SALDO DEMONSTRATIVO",
                   value:
                       "R\$ ${(userProvider.usuarioLogado?.saldoFinanceiro ?? 0.0).toStringAsFixed(2).replaceAll('.', ',')}",
                   color: Colors.amber,
@@ -223,6 +223,11 @@ class _CoachDashboardState extends State<CoachDashboard> {
               ],
             ),
 
+            const SizedBox(height: 8),
+            const Text(
+              'Saldo demonstrativo',
+              style: TextStyle(color: Colors.white54, fontSize: 11),
+            ),
             const SizedBox(height: 24),
 
             if (_solicitacoesPendentes.isNotEmpty) ...[

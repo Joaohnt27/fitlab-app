@@ -6,11 +6,12 @@ import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import '../models/user_model.dart';
 import '../widgets/plan_card.dart';
+import '../utils/subscription_plan.dart';
 
 class SubscriptionScreen extends StatelessWidget {
   const SubscriptionScreen({super.key});
 
-  // 👇 MÉTODO AUXILIAR PARA PEGAR O HEADER COM TOKEN 👇
+  // MÉTODO AUXILIAR PARA PEGAR O HEADER COM TOKEN 
   Map<String, String> _getAuthHeaders(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final token = userProvider.token;
@@ -46,6 +47,11 @@ class SubscriptionScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildCurrentPlanHeader(usuario),
+            const SizedBox(height: 12),
+            const Text(
+              'Assinatura simulada',
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+            ),
             const SizedBox(height: 40),
             Text(
               isTreinador ? "PLANOS PARA CIENTISTAS" : "UPGRADES BIOMÉTRICOS",
@@ -75,7 +81,7 @@ class SubscriptionScreen extends StatelessWidget {
             const SizedBox(height: 20),
             const Center(
               child: Text(
-                "Cobrança processada via FitLab Pay",
+                "Demonstração acadêmica (sem cobrança real)",
                 style: TextStyle(color: Colors.white24, fontSize: 11),
               ),
             ),
@@ -194,7 +200,7 @@ class SubscriptionScreen extends StatelessWidget {
     String planoAtual,
     String planoAlvo,
   ) {
-    if (planoAtual == planoAlvo) {
+    if (canonicalSubscriptionName(planoAtual) == canonicalSubscriptionName(planoAlvo)) {
       _confirmarCancelamento(context);
     } else {
       _simularCompra(context, planoAlvo);
@@ -260,7 +266,7 @@ class SubscriptionScreen extends StatelessWidget {
               const CircularProgressIndicator(color: Color(0xFF06B6D4)),
               const SizedBox(height: 24),
               const Text(
-                "SINTETIZANDO ACESSO...",
+                "SIMULANDO ASSINATURA...",
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -279,6 +285,7 @@ class SubscriptionScreen extends StatelessWidget {
     );
 
     Future.delayed(const Duration(seconds: 2), () {
+      if (!context.mounted) return;
       Navigator.pop(context);
       _processarUpgradeOuCancelamento(context, novoPlano);
     });
@@ -293,13 +300,6 @@ class SubscriptionScreen extends StatelessWidget {
 
     if (usuario == null) return;
 
-    int planoId = 1; // 1 = Free
-    if (planoNome.contains("Pro")) {
-      planoId = 2; // 2 = Pro
-    } else if (planoNome.contains("Elite")) {
-      planoId = 3; // 3 = Elite
-    }
-
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -308,21 +308,29 @@ class SubscriptionScreen extends StatelessWidget {
       ),
     );
 
+    var loadingVisible = true;
     try {
+      final headers = _getAuthHeaders(context);
+      final catalogResponse = await http.get(Uri.parse('${ApiConstants.baseUrl}/planos'), headers: headers);
+      if (catalogResponse.statusCode != 200) throw const FormatException('Catálogo indisponível.');
+      final catalog = json.decode(utf8.decode(catalogResponse.bodyBytes));
+      if (catalog is! List) throw const FormatException('Catálogo inválido.');
+      final planoId = subscriptionPlanId(catalog, planoNome);
       final url = Uri.parse('${ApiConstants.baseUrl}/planos/upgrade');
 
-      // 👇 INJETANDO O TOKEN AQUI 👇
+      // INJETANDO O TOKEN AQUI 
       final response = await http.put(
         url,
-        headers: _getAuthHeaders(context),
+        headers: headers,
         body: json.encode({"usuario_id": usuario.id, "plano_id": planoId}),
       );
 
       if (context.mounted) Navigator.pop(context);
+      loadingVisible = false;
 
       if (response.statusCode == 200) {
         provider.atualizarPerfilCompleto(
-          usuario.copyWith(plano: {"nome": planoNome}),
+          UserModel.fromJson(json.decode(utf8.decode(response.bodyBytes))),
         );
 
         if (context.mounted) {
@@ -339,10 +347,10 @@ class SubscriptionScreen extends StatelessWidget {
     } catch (e) {
       debugPrint("Erro no upgrade: $e");
       if (context.mounted) {
-        Navigator.pop(context); 
+        if (loadingVisible) Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Falha ao processar pagamento. Tente novamente."),
+            content: Text("Falha ao atualizar a assinatura simulada. Tente novamente."),
             backgroundColor: Colors.redAccent,
           ),
         );

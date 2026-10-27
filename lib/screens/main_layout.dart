@@ -5,6 +5,8 @@ import 'package:fitlab_mobile2/screens/profile_screen.dart';
 import 'package:fitlab_mobile2/screens/run_screen.dart';
 import 'package:flutter/material.dart';
 import 'workouts_screen.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -17,7 +19,6 @@ class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
 
   final List<Widget> _screens = [
-    const FeedScreen(),
     const WorkoutsScreen(),
     const RunScreen(),
     const CommunityScreen(),
@@ -25,6 +26,9 @@ class _MainLayoutState extends State<MainLayout> {
   ];
 
   void _onItemTapped(int index) {
+    if (_selectedIndex == 0 && index == 0) {
+      context.read<UserProvider>().notificarFeedAtualizado();
+    }
     if (_selectedIndex != index) {
       setState(() {
         _selectedIndex = index;
@@ -60,7 +64,7 @@ class _MainLayoutState extends State<MainLayout> {
       
       body: IndexedStack(
         index: _selectedIndex,
-        children: _screens,
+        children: [FeedScreen(active: _selectedIndex == 0), ..._screens],
       ),
 
       bottomNavigationBar: Padding(

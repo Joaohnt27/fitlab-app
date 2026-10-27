@@ -37,6 +37,15 @@ class _FeedCardState extends State<FeedCard> {
     _isLiked = widget.post['curtidoPorMim'] ?? false;
   }
 
+  @override
+  void didUpdateWidget(covariant FeedCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_isLoadingLike) {
+      _likesCount = widget.post['likes'] ?? 0;
+      _isLiked = widget.post['curtidoPorMim'] ?? false;
+    }
+  }
+
   Future<void> _toggleLike() async {
     if (_isLoadingLike) return;
 
@@ -53,6 +62,7 @@ class _FeedCardState extends State<FeedCard> {
     try {
       final response = await http.post(url, headers: _getAuthHeaders());
 
+      if (!mounted) return;
       if (response.statusCode == 200) {
         setState(() {
           if (response.body == "Postagem curtida") {
@@ -67,7 +77,7 @@ class _FeedCardState extends State<FeedCard> {
     } catch (e) {
       debugPrint("Erro ao curtir post: $e");
     } finally {
-      setState(() => _isLoadingLike = false);
+      if (mounted) setState(() => _isLoadingLike = false);
     }
   }
 
@@ -88,6 +98,7 @@ class _FeedCardState extends State<FeedCard> {
           child: CommentsSheet(
             idPost: widget.post['id'] ?? 0,
             onComentarioAdicionado: () {
+              if (!mounted) return;
               setState(() {
                 widget.post['comentarios'] =
                     (int.parse(widget.post['comentarios']?.toString() ?? '0') +

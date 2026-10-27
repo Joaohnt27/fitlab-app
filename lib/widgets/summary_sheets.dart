@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../providers/user_provider.dart';
 import '../config/api_constants.dart';
 import '../utils/route_codec.dart';
+import 'run_feedback.dart';
 
 class SummarySheet extends StatefulWidget {
   final List<LatLng> route;
@@ -114,10 +115,11 @@ Baixe o FitLab e venha pro laboratório também! 🧬
 
     // Usa a referência salva da tela principal para mostrar o SnackBar 
     scaffoldMessenger.showSnackBar(
-      const SnackBar(
-        content: Text("Enviando para o feed..."),
-        backgroundColor: Colors.white38,
-        duration: Duration(seconds: 1),
+      runFeedbackSnackBar(
+        title: 'Enviando para o feed...',
+        message: 'Publicando o resumo da sua atividade.',
+        icon: Icons.cloud_upload_outlined,
+        duration: const Duration(seconds: 1),
       ),
     );
 
@@ -150,26 +152,32 @@ Baixe o FitLab e venha pro laboratório também! 🧬
       );
 
       if (response.statusCode == 200) {
+        userProvider.notificarFeedAtualizado();
         scaffoldMessenger.showSnackBar(
-          const SnackBar(
-            content: Text("Publicado com sucesso no seu Feed! 🚀"),
-            backgroundColor: Color(0xFF06B6D4),
+          runFeedbackSnackBar(
+            title: 'Atividade publicada',
+            message: 'O resumo já está disponível no seu feed.',
+            icon: Icons.check_circle_outline_rounded,
           ),
         );
       } else {
         scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text("Erro ao publicar: ${response.statusCode}"),
-            backgroundColor: Colors.orange,
+          runFeedbackSnackBar(
+            title: 'Publicação não concluída',
+            message: 'Não foi possível publicar no feed (HTTP ${response.statusCode}).',
+            icon: Icons.cloud_off_rounded,
+            warning: true,
           ),
         );
       }
     } catch (e) {
       debugPrint("Erro ao postar: $e");
       scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text("Erro ao publicar. Verifique sua conexão."),
-          backgroundColor: Colors.redAccent,
+        runFeedbackSnackBar(
+          title: 'Publicação não concluída',
+          message: 'Verifique sua conexão e tente novamente.',
+          icon: Icons.cloud_off_rounded,
+          warning: true,
         ),
       );
     } finally {

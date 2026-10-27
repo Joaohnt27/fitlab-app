@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import '../providers/user_provider.dart';
 import '../widgets/summary_sheets.dart';
 import '../widgets/countdown_overlay.dart';
+import '../widgets/run_feedback.dart';
 import '../models/run_tracker.dart';
 import '../models/activity_save_attempt.dart';
 import '../services/session_api.dart';
@@ -99,9 +100,15 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Ative o GPS do celular.")));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        runFeedbackSnackBar(
+          title: 'GPS desativado',
+          message: 'Ative o GPS do celular para acompanhar o percurso.',
+          icon: Icons.location_off_rounded,
+          warning: true,
+        ),
+      );
       return;
     }
 
@@ -311,9 +318,11 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
       _positionStream?.cancel();
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Treino muito curto para ser registrado no Lab! 🧪"),
-          backgroundColor: Colors.orange,
+        runFeedbackSnackBar(
+          title: 'Atividade muito curta',
+          message: 'Treino muito curto para ser registrado no Lab.',
+          icon: Icons.timer_outlined,
+          warning: true,
         ),
       );
 
@@ -544,26 +553,17 @@ class _RunScreenState extends State<RunScreen> with TickerProviderStateMixin {
           if (isCountingDown) CountdownOverlay(value: countdownValue),
           if (_attempt != null && !_summaryOpen)
             Positioned(
-              top: 70,
+              top: 0,
               left: 16,
               right: 16,
-              child: Material(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Text(_saving
-                          ? 'Salvando atividade...'
-                          : _saveError ?? 'Aguardando confirmação do salvamento.'),
-                      if (!_saving)
-                        TextButton(
-                          onPressed: _savePending,
-                          child: const Text('Tentar salvar novamente'),
-                        ),
-                    ],
-                  ),
+              child: SafeArea(
+                bottom: false,
+                minimum: const EdgeInsets.only(top: 16),
+                child: RunSaveNotice(
+                  saving: _saving,
+                  saved: _attempt!.result != null,
+                  error: _saveError,
+                  onRetry: _savePending,
                 ),
               ),
             ),

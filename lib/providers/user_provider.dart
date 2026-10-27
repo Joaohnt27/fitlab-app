@@ -11,6 +11,14 @@ import '../services/notification_service.dart';
 class UserProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
 
+  int _feedRevision = 0;
+  int get feedRevision => _feedRevision;
+
+  void notificarFeedAtualizado() {
+    ++_feedRevision;
+    notifyListeners();
+  }
+
   String? _token;
   String? get token => _token;
 
